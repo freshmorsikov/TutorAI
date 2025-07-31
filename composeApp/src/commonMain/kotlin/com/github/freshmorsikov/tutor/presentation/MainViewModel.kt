@@ -5,8 +5,10 @@ import ai.koog.agents.core.dsl.builder.AIAgentNodeDelegate
 import ai.koog.agents.core.dsl.builder.AIAgentSubgraphBuilderBase
 import ai.koog.agents.core.dsl.builder.forwardTo
 import ai.koog.agents.core.dsl.builder.strategy
+import ai.koog.agents.core.dsl.extension.nodeLLMRequestStructured
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.executor.llms.all.simpleOpenAIExecutor
+import ai.koog.prompt.structure.StructuredResponse
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.freshmorsikov.tutor.LearningPlan
@@ -18,7 +20,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tutor.composeApp.BuildConfig
 
-class MainViewModel: ViewModel() {
+class MainViewModel : ViewModel() {
 
     private val _state: MutableStateFlow<MainState> = MutableStateFlow(MainState.WaitingForTopic())
     val state: StateFlow<MainState> = _state.asStateFlow()
@@ -26,26 +28,15 @@ class MainViewModel: ViewModel() {
     private val mainStrategy = strategy(name = "Main") {
         val nodeUpdateState by nodeUpdateState()
 
-        val nodeCallLLM by node<String, Result<LearningPlan>> { input ->
-            val structuredResponse = llm.writeSession {
-                updatePrompt {
-                    user(input)
-                }
-                requestLLMStructured(
-                    structure = learningPlanStructure,
-                    retries = 3,
-                    fixingModel = OpenAIModels.Chat.GPT4o,
-                )
-            }
-
-            structuredResponse.map {
-                it.structure
-            }
-        }
+        val nodeCallLLM by nodeLLMRequestStructured(
+            structure = learningPlanStructure,
+            retries = 3,
+            fixingModel = OpenAIModels.Chat.GPT4o,
+        )
 
         edge(nodeStart forwardTo nodeCallLLM)
         edge(nodeCallLLM forwardTo nodeUpdateState)
-        edge(nodeUpdateState forwardTo nodeFinish)
+        edge(nodeUpdateState forwardTo nodeFinish onCondition { false })
     }
     private val agent = AIAgent(
         executor = simpleOpenAIExecutor(BuildConfig.OPENAI_API_KEY),
@@ -83,18 +74,18 @@ class MainViewModel: ViewModel() {
         }
     }
 
-    private fun AIAgentSubgraphBuilderBase<*, *>.nodeUpdateState(): AIAgentNodeDelegate<Result<LearningPlan>, String> =
+    private fun AIAgentSubgraphBuilderBase<*, *>.nodeUpdateState(): AIAgentNodeDelegate<Result<StructuredResponse<LearningPlan>>, String> =
         node("updateState") { input ->
             input.onSuccess { data ->
                 _state.update {
                     MainState.Data(
-                        topic = data.topic,
-                        overview = data.overview,
-                        subtopics = data.subtopics,
+                        topic = data.structure.topic,
+                        overview = data.structure.overview,
+                        subtopics = data.structure.subtopics,
                     )
                 }
             }.onFailure {
-                // TODO
+                // TODO handle error
             }
 
             "DONE"
