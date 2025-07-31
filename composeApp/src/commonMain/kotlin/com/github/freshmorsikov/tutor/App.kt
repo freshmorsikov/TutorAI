@@ -66,7 +66,12 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
                     }
 
                     is MainState.Data -> {
-                        Messages(state = stateValue)
+                        Messages(
+                            state = stateValue,
+                            onSubtopicClick = { subtopic ->
+                                viewModel.selectSubtopic(subtopic = subtopic)
+                            },
+                        )
                     }
                 }
             }
@@ -188,6 +193,7 @@ private fun Topics(
 @Composable
 private fun Messages(
     state: MainState.Data,
+    onSubtopicClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -220,7 +226,9 @@ private fun Messages(
         state.subtopics.forEachIndexed { i, subtopic ->
             item(key = "subtopic$i") {
                 Button(
-                    onClick = {},
+                    onClick = {
+                        onSubtopicClick(subtopic)
+                    },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary,
                         contentColor = MaterialTheme.colorScheme.onSecondary,

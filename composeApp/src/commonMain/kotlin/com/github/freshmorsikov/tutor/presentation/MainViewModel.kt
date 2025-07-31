@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.freshmorsikov.tutor.LearningPlan
 import com.github.freshmorsikov.tutor.learningPlanStructure
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,17 +26,21 @@ class MainViewModel : ViewModel() {
     private val _state: MutableStateFlow<MainState> = MutableStateFlow(MainState.WaitingForTopic())
     val state: StateFlow<MainState> = _state.asStateFlow()
 
-    private val mainStrategy = strategy(name = "Main") {
-        val nodeUpdateState by nodeUpdateState()
+    private val subtopicChannel: Channel<String> = Channel()
 
+    private val mainStrategy = strategy<String, String>(name = "Main") {
         val nodeCallLLM by nodeLLMRequestStructured(
             structure = learningPlanStructure,
             retries = 3,
             fixingModel = OpenAIModels.Chat.GPT4o,
         )
+        val nodeUpdateState by nodeUpdateState()
+        val nodeSubtopicDiving by nodeSubtopicDiving()
 
         edge(nodeStart forwardTo nodeCallLLM)
         edge(nodeCallLLM forwardTo nodeUpdateState)
+        edge(nodeUpdateState forwardTo nodeSubtopicDiving)
+        edge(nodeSubtopicDiving forwardTo nodeCallLLM)
         edge(nodeUpdateState forwardTo nodeFinish onCondition { false })
     }
     private val agent = AIAgent(
@@ -74,6 +79,12 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun selectSubtopic(subtopic: String) {
+        viewModelScope.launch {
+            subtopicChannel.send(subtopic)
+        }
+    }
+
     private fun AIAgentSubgraphBuilderBase<*, *>.nodeUpdateState(): AIAgentNodeDelegate<Result<StructuredResponse<LearningPlan>>, String> =
         node("updateState") { input ->
             input.onSuccess { data ->
@@ -89,6 +100,11 @@ class MainViewModel : ViewModel() {
             }
 
             "DONE"
+        }
+
+    private fun AIAgentSubgraphBuilderBase<*, *>.nodeSubtopicDiving(): AIAgentNodeDelegate<String, String> =
+        node("subtopicDiving") {
+            subtopicChannel.receive()
         }
 
 }
