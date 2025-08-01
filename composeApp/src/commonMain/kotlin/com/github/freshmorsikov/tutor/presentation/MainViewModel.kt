@@ -99,7 +99,13 @@ class MainViewModel : ViewModel() {
             input.onSuccess { data ->
                 _state.update {
                     val previousData = it as? MainState.Data
+                    val topicChain = if (previousData == null) {
+                        data.structure.topic
+                    } else {
+                        "${previousData.topicChain} > ${data.structure.topic}"
+                    }
                     MainState.Data(
+                        topicChain = topicChain,
                         currentLearningNode = createLearningNode(
                             id = previousData?.loadingSubtopicId ?: ROOT_ID,
                             topic = data.structure.topic,

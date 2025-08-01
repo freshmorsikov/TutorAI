@@ -42,7 +42,7 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
             if (stateValue is MainState.Data) {
                 Topics(
                     modifier = Modifier.padding(16.dp),
-                    topic = stateValue.currentLearningNode.topic,
+                    topic = stateValue.topicChain
                 )
             }
 

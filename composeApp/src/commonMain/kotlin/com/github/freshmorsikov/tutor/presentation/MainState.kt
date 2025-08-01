@@ -8,6 +8,7 @@ sealed interface MainState {
     ) : MainState
 
     data class Data(
+        val topicChain: String,
         val currentLearningNode: LearningNode.Explored,
         val loadingSubtopicId: String?
     ) : MainState
