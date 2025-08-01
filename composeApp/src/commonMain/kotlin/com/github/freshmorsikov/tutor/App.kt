@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +42,7 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
             if (stateValue is MainState.Data) {
                 Topics(
                     modifier = Modifier.padding(16.dp),
-                    topic = stateValue.topic,
+                    topic = stateValue.currentLearningNode.topic,
                 )
             }
 
@@ -68,8 +69,8 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
                     is MainState.Data -> {
                         Messages(
                             state = stateValue,
-                            onSubtopicClick = { subtopic ->
-                                viewModel.selectSubtopic(subtopic = subtopic)
+                            onSubtopicClick = { subtopicId ->
+                                viewModel.selectSubtopic(subtopicId = subtopicId)
                             },
                         )
                     }
@@ -216,25 +217,39 @@ private fun Messages(
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             shape = RoundedCornerShape(20.dp)
                         ).padding(16.dp),
-                        text = state.overview,
+                        text = state.currentLearningNode.overview,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
             }
         }
 
-        state.subtopics.forEachIndexed { i, subtopic ->
-            item(key = "subtopic$i") {
+        state.currentLearningNode.subtopics.forEach { subtopic ->
+            item(key = "subtopic_${subtopic.id}") {
                 Button(
                     onClick = {
-                        onSubtopicClick(subtopic)
+                        onSubtopicClick(subtopic.id)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary,
                         contentColor = MaterialTheme.colorScheme.onSecondary,
                     )
                 ) {
-                    Text(text = subtopic)
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            modifier = Modifier.alpha(alpha = if (state.loadingSubtopicId == subtopic.id) 0f else 1f),
+                            text = subtopic.topic,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+
+                        if (state.loadingSubtopicId == subtopic.id) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSecondary,
+                            )
+                        }
+                    }
                 }
             }
         }

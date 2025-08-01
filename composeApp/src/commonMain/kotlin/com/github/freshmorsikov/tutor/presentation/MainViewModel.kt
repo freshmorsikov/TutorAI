@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tutor.composeApp.BuildConfig
+import kotlin.uuid.ExperimentalUuidApi
+
+private const val ROOT_ID = "root"
 
 class MainViewModel : ViewModel() {
 
@@ -40,7 +43,7 @@ class MainViewModel : ViewModel() {
         edge(nodeStart forwardTo nodeCallLLM)
         edge(nodeCallLLM forwardTo nodeUpdateState)
         edge(nodeUpdateState forwardTo nodeSubtopicDiving)
-        edge(nodeSubtopicDiving forwardTo nodeCallLLM)
+        edge(nodeSubtopicDiving forwardTo nodeCallLLM onCondition { it.isSuccess } transformed { it.getOrNull() ?: "" })
         edge(nodeUpdateState forwardTo nodeFinish onCondition { false })
     }
     private val agent = AIAgent(
@@ -79,20 +82,32 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun selectSubtopic(subtopic: String) {
+    fun selectSubtopic(subtopicId: String) {
         viewModelScope.launch {
-            subtopicChannel.send(subtopic)
+            subtopicChannel.send(subtopicId)
+            _state.update {
+                val currentData = it as? MainState.Data ?: return@update it
+
+                currentData.copy(loadingSubtopicId = subtopicId)
+            }
         }
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     private fun AIAgentSubgraphBuilderBase<*, *>.nodeUpdateState(): AIAgentNodeDelegate<Result<StructuredResponse<LearningPlan>>, String> =
         node("updateState") { input ->
             input.onSuccess { data ->
                 _state.update {
+                    val previousData = it as? MainState.Data
                     MainState.Data(
-                        topic = data.structure.topic,
-                        overview = data.structure.overview,
-                        subtopics = data.structure.subtopics,
+                        currentLearningNode = createLearningNode(
+                            id = previousData?.loadingSubtopicId ?: ROOT_ID,
+                            topic = data.structure.topic,
+                            subtopics = data.structure.subtopics,
+                            overview = data.structure.overview,
+                            parent = previousData?.currentLearningNode
+                        ),
+                        loadingSubtopicId = null
                     )
                 }
             }.onFailure {
@@ -102,9 +117,24 @@ class MainViewModel : ViewModel() {
             "DONE"
         }
 
-    private fun AIAgentSubgraphBuilderBase<*, *>.nodeSubtopicDiving(): AIAgentNodeDelegate<String, String> =
+    private fun AIAgentSubgraphBuilderBase<*, *>.nodeSubtopicDiving(): AIAgentNodeDelegate<String, Result<String>> =
         node("subtopicDiving") {
-            subtopicChannel.receive()
+            val subtopicId = subtopicChannel.receive()
+
+            when (val currentValue = _state.value) {
+                is MainState.Data -> {
+                    currentValue.currentLearningNode.subtopics.find { subtopic ->
+                        subtopic.id == subtopicId
+                    }?.let { subtopic ->
+                        Result.success(value = subtopic.topic)
+                    } ?: Result.failure(exception = Exception("No such topic found"))
+                }
+
+                else -> {
+                    Result.failure(exception = Exception("Data not found"))
+                }
+
+            }
         }
 
 }
