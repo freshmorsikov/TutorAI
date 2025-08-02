@@ -83,12 +83,28 @@ class MainViewModel : ViewModel() {
     }
 
     fun selectSubtopic(subtopicId: String) {
-        viewModelScope.launch {
-            subtopicChannel.send(subtopicId)
-            _state.update {
-                val currentData = it as? MainState.Data ?: return@update it
+        val currentData = _state.value as? MainState.Data ?: return
+        val subtopic = currentData.currentLearningNode.subtopics.find {
+            it.id == subtopicId
+        } ?: return
 
-                currentData.copy(loadingSubtopicId = subtopicId)
+        when (subtopic) {
+            is LearningNode.Unexplored -> {
+                viewModelScope.launch {
+                    subtopicChannel.send(subtopicId)
+                    _state.update {
+                        currentData.copy(loadingSubtopicId = subtopicId)
+                    }
+                }
+            }
+
+            is LearningNode.Explored -> {
+                _state.update {
+                    currentData.copy(
+                        topicChain = currentData.topicChain + subtopic.topic,
+                        currentLearningNode = subtopic
+                    )
+                }
             }
         }
     }
@@ -96,11 +112,20 @@ class MainViewModel : ViewModel() {
     fun goToPreviousTopic() {
         _state.update {
             val currentData = it as? MainState.Data ?: return@update it
-            val parentNode = currentData.currentLearningNode.parent ?: return@update it
+            val currentNode = currentData.currentLearningNode
+            val parentNode = currentNode.parent ?: return@update it
 
             currentData.copy(
                 topicChain = currentData.topicChain - currentData.currentLearningNode.topic,
-                currentLearningNode = parentNode
+                currentLearningNode = parentNode.copy(
+                    subtopics = parentNode.subtopics.map { subtopic ->
+                        if (subtopic.id == currentNode.id) {
+                            currentNode
+                        } else {
+                            subtopic
+                        }
+                    }
+                )
             )
         }
     }
@@ -110,20 +135,20 @@ class MainViewModel : ViewModel() {
         node("updateState") { input ->
             input.onSuccess { data ->
                 _state.update {
-                    val previousData = it as? MainState.Data
-                    val topicChain = if (previousData == null) {
+                    val currentData = it as? MainState.Data
+                    val topicChain = if (currentData == null) {
                         listOf(data.structure.topic)
                     } else {
-                        previousData.topicChain + data.structure.topic
+                        currentData.topicChain + data.structure.topic
                     }
                     MainState.Data(
                         topicChain = topicChain,
                         currentLearningNode = createLearningNode(
-                            id = previousData?.loadingSubtopicId ?: ROOT_ID,
+                            id = currentData?.loadingSubtopicId ?: ROOT_ID,
                             topic = data.structure.topic,
                             subtopics = data.structure.subtopics,
                             overview = data.structure.overview,
-                            parent = previousData?.currentLearningNode
+                            parent = currentData?.currentLearningNode
                         ),
                         loadingSubtopicId = null
                     )
