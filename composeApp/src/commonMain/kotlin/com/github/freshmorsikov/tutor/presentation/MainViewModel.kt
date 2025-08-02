@@ -93,6 +93,18 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun goToPreviousTopic() {
+        _state.update {
+            val currentData = it as? MainState.Data ?: return@update it
+            val parentNode = currentData.currentLearningNode.parent ?: return@update it
+
+            currentData.copy(
+                topicChain = currentData.topicChain - currentData.currentLearningNode.topic,
+                currentLearningNode = parentNode
+            )
+        }
+    }
+
     @OptIn(ExperimentalUuidApi::class)
     private fun AIAgentSubgraphBuilderBase<*, *>.nodeUpdateState(): AIAgentNodeDelegate<Result<StructuredResponse<LearningPlan>>, String> =
         node("updateState") { input ->
@@ -100,9 +112,9 @@ class MainViewModel : ViewModel() {
                 _state.update {
                     val previousData = it as? MainState.Data
                     val topicChain = if (previousData == null) {
-                        data.structure.topic
+                        listOf(data.structure.topic)
                     } else {
-                        "${previousData.topicChain} > ${data.structure.topic}"
+                        previousData.topicChain + data.structure.topic
                     }
                     MainState.Data(
                         topicChain = topicChain,

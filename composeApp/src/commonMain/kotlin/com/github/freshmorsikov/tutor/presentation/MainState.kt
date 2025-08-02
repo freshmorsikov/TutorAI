@@ -8,9 +8,17 @@ sealed interface MainState {
     ) : MainState
 
     data class Data(
-        val topicChain: String,
+        val topicChain: List<String>,
         val currentLearningNode: LearningNode.Explored,
-        val loadingSubtopicId: String?
-    ) : MainState
+        val loadingSubtopicId: String?,
+    ) : MainState {
+
+        val topics: String
+            get() = topicChain.joinToString(" > ")
+
+        val isBackEnabled: Boolean
+            get() = topicChain.size > 1
+
+    }
 
 }

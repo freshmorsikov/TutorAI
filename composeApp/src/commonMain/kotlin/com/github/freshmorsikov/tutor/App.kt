@@ -3,6 +3,7 @@ package com.github.freshmorsikov.tutor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement.Absolute.spacedBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.github.freshmorsikov.tutor.icon.ArrowLeft
 import com.github.freshmorsikov.tutor.icon.ArrowUp
 import com.github.freshmorsikov.tutor.presentation.MainState
 import com.github.freshmorsikov.tutor.presentation.MainViewModel
@@ -40,10 +42,40 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
             val stateValue = state
 
             if (stateValue is MainState.Data) {
-                Topics(
+                Row(
                     modifier = Modifier.padding(16.dp),
-                    topic = stateValue.topicChain
-                )
+                    horizontalArrangement = spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val borderAlpha = if (stateValue.isBackEnabled) 1f else 0.4f
+                    IconButton(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = borderAlpha),
+                                shape = CircleShape
+                            ),
+                        enabled = stateValue.isBackEnabled,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        ),
+                        onClick = {
+                            viewModel.goToPreviousTopic()
+                        }
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(24.dp),
+                            imageVector = Icons.ArrowLeft,
+                            contentDescription = null
+                        )
+                    }
+                    Topics(topic = stateValue.topics)
+                }
             }
 
             Column(
