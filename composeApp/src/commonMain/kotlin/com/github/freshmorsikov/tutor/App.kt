@@ -249,32 +249,36 @@ private fun Messages(
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             shape = RoundedCornerShape(20.dp)
                         ).padding(16.dp),
-                        text = state.currentLearningNode.overview,
+                        text = state.overview,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
             }
         }
 
-        state.currentLearningNode.subtopics.forEach { subtopic ->
+        state.subtopics.forEach { subtopic ->
             item(key = "subtopic_${subtopic.id}") {
                 Button(
                     onClick = {
                         onSubtopicClick(subtopic.id)
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary,
+                        containerColor = if (subtopic.isExplored) {
+                            Color(0xFF5BC589)
+                        } else {
+                            MaterialTheme.colorScheme.secondary
+                        },
                         contentColor = MaterialTheme.colorScheme.onSecondary,
                     )
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            modifier = Modifier.alpha(alpha = if (state.loadingSubtopicId == subtopic.id) 0f else 1f),
-                            text = subtopic.topic,
+                            modifier = Modifier.alpha(alpha = if (subtopic.isLoading) 0f else 1f),
+                            text = subtopic.title,
                             style = MaterialTheme.typography.labelMedium
                         )
 
-                        if (state.loadingSubtopicId == subtopic.id) {
+                        if (subtopic.isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,

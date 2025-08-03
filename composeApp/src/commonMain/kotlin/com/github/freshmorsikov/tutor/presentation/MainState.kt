@@ -9,8 +9,9 @@ sealed interface MainState {
 
     data class Data(
         val topicChain: List<String>,
-        val currentLearningNode: LearningNode.Explored,
-        val loadingSubtopicId: String?,
+        val topic: String,
+        val overview: String,
+        val subtopics: List<Subtopic>,
     ) : MainState {
 
         val topics: String
@@ -20,5 +21,12 @@ sealed interface MainState {
             get() = topicChain.size > 1
 
     }
+
+    data class Subtopic(
+        val id: String,
+        val title: String,
+        val isLoading: Boolean,
+        val isExplored: Boolean,
+    )
 
 }

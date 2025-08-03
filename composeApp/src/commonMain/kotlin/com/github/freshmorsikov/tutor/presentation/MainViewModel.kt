@@ -12,7 +12,10 @@ import ai.koog.prompt.structure.StructuredResponse
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.freshmorsikov.tutor.LearningPlan
+import com.github.freshmorsikov.tutor.data.LearningRepository
+import com.github.freshmorsikov.tutor.data.Node
 import com.github.freshmorsikov.tutor.learningPlanStructure
+import com.github.freshmorsikov.tutor.presentation.MainState.Subtopic
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +27,9 @@ import kotlin.uuid.ExperimentalUuidApi
 
 private const val ROOT_ID = "root"
 
-class MainViewModel : ViewModel() {
+class MainViewModel(
+    private val learningRepository: LearningRepository = LearningRepository(),
+) : ViewModel() {
 
     private val _state: MutableStateFlow<MainState> = MutableStateFlow(MainState.WaitingForTopic())
     val state: StateFlow<MainState> = _state.asStateFlow()
@@ -84,27 +89,34 @@ class MainViewModel : ViewModel() {
 
     fun selectSubtopic(subtopicId: String) {
         val currentData = _state.value as? MainState.Data ?: return
-        val subtopic = currentData.currentLearningNode.subtopics.find {
-            it.id == subtopicId
-        } ?: return
 
-        when (subtopic) {
-            is LearningNode.Unexplored -> {
-                viewModelScope.launch {
-                    subtopicChannel.send(subtopicId)
-                    _state.update {
-                        currentData.copy(loadingSubtopicId = subtopicId)
-                    }
-                }
-            }
-
-            is LearningNode.Explored -> {
+        val switchedNode = learningRepository.switchToExplored(id = subtopicId)
+        if (switchedNode == null) {
+            viewModelScope.launch {
+                subtopicChannel.send(subtopicId)
                 _state.update {
                     currentData.copy(
-                        topicChain = currentData.topicChain + subtopic.topic,
-                        currentLearningNode = subtopic
+                        subtopics = currentData.subtopics.map { subtopic ->
+                            subtopic.copy(isLoading = subtopic.id == subtopicId)
+                        }
                     )
                 }
+            }
+        } else {
+            _state.update {
+                currentData.copy(
+                    topicChain = currentData.topicChain + switchedNode.title,
+                    topic = switchedNode.title,
+                    overview = switchedNode.overview,
+                    subtopics = switchedNode.subtopics.map { subtopic ->
+                        Subtopic(
+                            id = subtopic.id,
+                            title = subtopic.title,
+                            isLoading = false,
+                            isExplored = subtopic is Node.Explored,
+                        )
+                    },
+                )
             }
         }
     }
@@ -112,20 +124,20 @@ class MainViewModel : ViewModel() {
     fun goToPreviousTopic() {
         _state.update {
             val currentData = it as? MainState.Data ?: return@update it
-            val currentNode = currentData.currentLearningNode
-            val parentNode = currentNode.parent ?: return@update it
+            val parentNode = learningRepository.switchToParent() ?: return@update it
 
             currentData.copy(
-                topicChain = currentData.topicChain - currentData.currentLearningNode.topic,
-                currentLearningNode = parentNode.copy(
-                    subtopics = parentNode.subtopics.map { subtopic ->
-                        if (subtopic.id == currentNode.id) {
-                            currentNode
-                        } else {
-                            subtopic
-                        }
-                    }
-                )
+                topicChain = currentData.topicChain - currentData.topic,
+                topic = parentNode.title,
+                overview = parentNode.overview,
+                subtopics = parentNode.subtopics.map { subtopic ->
+                    Subtopic(
+                        id = subtopic.id,
+                        title = subtopic.title,
+                        isLoading = false,
+                        isExplored = subtopic is Node.Explored,
+                    )
+                },
             )
         }
     }
@@ -141,16 +153,28 @@ class MainViewModel : ViewModel() {
                     } else {
                         currentData.topicChain + data.structure.topic
                     }
+                    val loadingSubtopic = currentData?.subtopics?.find { subtopic ->
+                        subtopic.isLoading
+                    }
+                    val newNode = learningRepository.exploreNode(
+                        id = loadingSubtopic?.id ?: ROOT_ID,
+                        topic = data.structure.topic,
+                        subtopics = data.structure.subtopics,
+                        overview = data.structure.overview,
+                    )
+
                     MainState.Data(
                         topicChain = topicChain,
-                        currentLearningNode = createLearningNode(
-                            id = currentData?.loadingSubtopicId ?: ROOT_ID,
-                            topic = data.structure.topic,
-                            subtopics = data.structure.subtopics,
-                            overview = data.structure.overview,
-                            parent = currentData?.currentLearningNode
-                        ),
-                        loadingSubtopicId = null
+                        topic = newNode.title,
+                        overview = newNode.overview,
+                        subtopics = newNode.subtopics.map { subtopic ->
+                            Subtopic(
+                                id = subtopic.id,
+                                title = subtopic.title,
+                                isLoading = false,
+                                isExplored = subtopic is Node.Explored,
+                            )
+                        }
                     )
                 }
             }.onFailure {
@@ -166,10 +190,10 @@ class MainViewModel : ViewModel() {
 
             when (val currentValue = _state.value) {
                 is MainState.Data -> {
-                    currentValue.currentLearningNode.subtopics.find { subtopic ->
+                    currentValue.subtopics.find { subtopic ->
                         subtopic.id == subtopicId
                     }?.let { subtopic ->
-                        Result.success(value = subtopic.topic)
+                        Result.success(value = subtopic.title)
                     } ?: Result.failure(exception = Exception("No such topic found"))
                 }
 
