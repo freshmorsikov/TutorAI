@@ -6,6 +6,12 @@ It's ideal for students, researchers, autodidacts, and anyone who wants to break
 
 ## 🧩 Example usage
 
+<div align="center">
+  <img 
+   src="https://github.com/user-attachments/assets/a15af5dd-a5d7-4dd1-9d7a-4b68ade41d18"
+   alt="Example usage">
+</div>
+
 ## ✨ Feature
 
 * Guides the user through a topic by:
