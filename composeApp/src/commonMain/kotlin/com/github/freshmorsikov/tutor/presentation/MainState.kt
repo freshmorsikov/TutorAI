@@ -8,19 +8,30 @@ sealed interface MainState {
     ) : MainState
 
     data class Data(
-        val topicChain: List<String>,
+        val topicChain: List<TopicChainItem>,
         val topic: String,
         val overview: String,
         val subtopics: List<Subtopic>,
     ) : MainState {
 
-        val topics: String
-            get() = topicChain.joinToString(" > ")
+        val previousTopicId: String?
+            get() {
+                return if (topicChain.size > 1) {
+                     topicChain[topicChain.lastIndex - 1].id
+                } else {
+                    null
+                }
+            }
 
         val isBackEnabled: Boolean
             get() = topicChain.size > 1
 
     }
+
+    data class TopicChainItem(
+        val id: String,
+        val title: String,
+    )
 
     data class Subtopic(
         val id: String,

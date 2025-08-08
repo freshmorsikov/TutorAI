@@ -1,7 +1,10 @@
 package com.github.freshmorsikov.tutor
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement.Absolute.spacedBy
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -25,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.freshmorsikov.tutor.icon.ArrowLeft
 import com.github.freshmorsikov.tutor.icon.ArrowUp
+import com.github.freshmorsikov.tutor.icon.ChevronRight
 import com.github.freshmorsikov.tutor.presentation.MainState
 import com.github.freshmorsikov.tutor.presentation.MainViewModel
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -65,7 +70,9 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
                             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                         ),
                         onClick = {
-                            viewModel.goToPreviousTopic()
+                            stateValue.previousTopicId?.let { topicId ->
+                                viewModel.goToPreviousTopic(topicId = topicId)
+                            }
                         }
                     ) {
                         Icon(
@@ -74,7 +81,12 @@ fun App(viewModel: MainViewModel = viewModel { MainViewModel() }) {
                             contentDescription = null
                         )
                     }
-                    Topics(topic = stateValue.topics)
+                    Topics(
+                        topics = stateValue.topicChain,
+                        onSelectTopic = { topicId ->
+                            viewModel.goToPreviousTopic(topicId = topicId)
+                        }
+                    )
                 }
             }
 
@@ -211,16 +223,45 @@ private fun WaitingForTopic(
 
 @Composable
 private fun Topics(
-    topic: String,
+    topics: List<MainState.TopicChainItem>,
+    onSelectTopic: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Text(
+    Row(
         modifier = modifier,
-        text = topic,
-        style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Bold
-        ),
-    )
+        horizontalArrangement = spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        topics.forEachIndexed { i, topic ->
+            val interactionSource = remember { MutableInteractionSource() }
+            Text(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = LocalIndication.current,
+                        onClick = {
+                            onSelectTopic(topic.id)
+                        }
+                    )
+                    .padding(4.dp),
+                text = topic.title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            if (i < topics.lastIndex) {
+                Icon(
+                    modifier = Modifier.size(12.dp),
+                    imageVector = Icons.ChevronRight,
+                    tint = MaterialTheme.colorScheme.outlineVariant,
+                    contentDescription = null,
+                )
+            }
+        }
+    }
+
 }
 
 @Composable

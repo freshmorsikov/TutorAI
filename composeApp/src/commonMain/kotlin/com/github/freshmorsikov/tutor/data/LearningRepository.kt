@@ -25,8 +25,11 @@ class LearningRepository {
         return newNode
     }
 
-    fun switchToParent(): Node.Explored? {
-        val parent = currentNode?.parent
+    fun switchToParent(topicId: String): Node.Explored? {
+        var parent = currentNode?.parent
+        while (parent != null && parent.id != topicId) {
+            parent = parent.parent
+        }
         if (parent != null) {
             currentNode = parent
         }

@@ -103,9 +103,13 @@ class MainViewModel(
                 }
             }
         } else {
+            val topicChainItem = MainState.TopicChainItem(
+                id = switchedNode.id,
+                title = switchedNode.title
+            )
             _state.update {
                 currentData.copy(
-                    topicChain = currentData.topicChain + switchedNode.title,
+                    topicChain = currentData.topicChain + topicChainItem,
                     topic = switchedNode.title,
                     overview = switchedNode.overview,
                     subtopics = switchedNode.subtopics.map { subtopic ->
@@ -121,13 +125,20 @@ class MainViewModel(
         }
     }
 
-    fun goToPreviousTopic() {
+    fun goToPreviousTopic(topicId: String) {
+        val currentData = _state.value as? MainState.Data ?: return
+        if (topicId == currentData.topicChain.last().id) {
+            return
+        }
+
         _state.update {
             val currentData = it as? MainState.Data ?: return@update it
-            val parentNode = learningRepository.switchToParent() ?: return@update it
+            val parentNode = learningRepository.switchToParent(topicId = topicId) ?: return@update it
 
             currentData.copy(
-                topicChain = currentData.topicChain - currentData.topic,
+                topicChain = currentData.topicChain.dropLastWhile { topicChainItem ->
+                    topicChainItem.id != parentNode.id
+                },
                 topic = parentNode.title,
                 overview = parentNode.overview,
                 subtopics = parentNode.subtopics.map { subtopic ->
@@ -148,13 +159,19 @@ class MainViewModel(
             input.onSuccess { data ->
                 _state.update {
                     val currentData = it as? MainState.Data
-                    val topicChain = if (currentData == null) {
-                        listOf(data.structure.topic)
-                    } else {
-                        currentData.topicChain + data.structure.topic
-                    }
+
                     val loadingSubtopic = currentData?.subtopics?.find { subtopic ->
                         subtopic.isLoading
+                    }
+                    val id = loadingSubtopic?.id ?: ROOT_ID
+                    val topicChainItem = MainState.TopicChainItem(
+                        id = id,
+                        title = data.structure.topic,
+                    )
+                    val topicChain = if (currentData == null) {
+                        listOf(topicChainItem)
+                    } else {
+                        currentData.topicChain + topicChainItem
                     }
                     val newNode = learningRepository.exploreNode(
                         id = loadingSubtopic?.id ?: ROOT_ID,
@@ -200,7 +217,6 @@ class MainViewModel(
                 else -> {
                     Result.failure(exception = Exception("Data not found"))
                 }
-
             }
         }
 
