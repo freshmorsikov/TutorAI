@@ -30,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.freshmorsikov.tutor.icon.ArrowLeft
 import com.github.freshmorsikov.tutor.icon.ArrowUp
 import com.github.freshmorsikov.tutor.icon.ChevronRight
+import com.github.freshmorsikov.tutor.icon.Video
 import com.github.freshmorsikov.tutor.presentation.MainState
 import com.github.freshmorsikov.tutor.presentation.MainViewModel
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -281,18 +282,61 @@ private fun Messages(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                SelectionContainer {
-                    Text(
-                        modifier = Modifier.weight(
-                            weight = 1f,
-                            fill = false,
-                        ).background(
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            shape = RoundedCornerShape(20.dp)
-                        ).padding(16.dp),
-                        text = state.overview,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                Column(
+                    modifier = Modifier.weight(
+                        weight = 1f,
+                        fill = false,
+                    ).background(
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = RoundedCornerShape(20.dp)
+                    ).padding(16.dp),
+                    verticalArrangement = spacedBy(8.dp)
+                ) {
+                    SelectionContainer {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = state.topic.overview,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                    Row(horizontalArrangement = spacedBy(8.dp)) {
+                        state.topic.videos.forEach { video ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            Row(
+                                modifier = Modifier
+                                    .widthIn(max = 200.dp)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = LocalIndication.current,
+                                        onClick = {
+                                            // TODO implement navigation
+                                        }
+                                    )
+                                    .background(color = Color(0xFFF53154))
+                                    .padding(
+                                        horizontal = 16.dp,
+                                        vertical = 8.dp
+                                    ),
+                                horizontalArrangement = spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    modifier = Modifier.size(16.dp),
+                                    imageVector = Icons.Video,
+                                    tint = Color.White,
+                                    contentDescription = null
+                                )
+                                Text(
+                                    text = video.title,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -1,5 +1,7 @@
 package com.github.freshmorsikov.tutor.presentation
 
+import com.github.freshmorsikov.tutor.domain.Topic
+
 sealed interface MainState {
 
     data class WaitingForTopic(
@@ -9,8 +11,7 @@ sealed interface MainState {
 
     data class Data(
         val topicChain: List<TopicChainItem>,
-        val topic: String,
-        val overview: String,
+        val topic: Topic,
         val subtopics: List<Subtopic>,
     ) : MainState {
 

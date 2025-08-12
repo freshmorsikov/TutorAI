@@ -1,23 +1,14 @@
 package com.github.freshmorsikov.tutor.data
 
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
+import com.github.freshmorsikov.tutor.domain.Topic
 
 class LearningRepository {
 
     private var currentNode: Node.Explored? = null
 
-    fun exploreNode(
-        id: String,
-        topic: String,
-        subtopics: List<String>,
-        overview: String,
-    ): Node.Explored {
+    fun exploreNode(topic: Topic): Node.Explored {
         val newNode = createNode(
-            id = id,
             topic = topic,
-            subtopics = subtopics,
-            overview = overview,
             parent = currentNode,
         )
         currentNode = newNode
@@ -50,28 +41,22 @@ class LearningRepository {
         }
     }
 
-    @OptIn(ExperimentalUuidApi::class)
     private fun createNode(
-        id: String,
-        topic: String,
-        subtopics: List<String>,
-        overview: String,
+        topic: Topic,
         parent: Node.Explored? = null,
     ): Node.Explored {
         val subtopicList: MutableList<Node> = mutableListOf()
         val node = Node.Explored(
-            id = id,
-            title = topic,
             parent = parent,
-            overview = overview,
+            topic = topic,
             subtopics = subtopicList
         )
         parent?.updateParent(node)
-        subtopics.forEach { subtopic ->
+        topic.subtopics.forEach { subtopic ->
             subtopicList.add(
                 Node.Unexplored(
-                    id = Uuid.random().toString(),
-                    title = subtopic,
+                    id = subtopic.id,
+                    title = subtopic.title,
                     parent = node,
                 )
             )

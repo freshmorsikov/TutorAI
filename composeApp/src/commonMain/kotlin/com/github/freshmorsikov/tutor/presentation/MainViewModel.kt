@@ -1,21 +1,28 @@
 package com.github.freshmorsikov.tutor.presentation
 
 import ai.koog.agents.core.agent.AIAgent
-import ai.koog.agents.core.dsl.builder.AIAgentNodeDelegate
-import ai.koog.agents.core.dsl.builder.AIAgentSubgraphBuilderBase
-import ai.koog.agents.core.dsl.builder.forwardTo
-import ai.koog.agents.core.dsl.builder.strategy
-import ai.koog.agents.core.dsl.extension.nodeLLMRequestStructured
+import ai.koog.agents.core.dsl.builder.*
+import ai.koog.agents.core.dsl.extension.nodeExecuteTool
+import ai.koog.agents.core.dsl.extension.nodeLLMRequest
+import ai.koog.agents.core.dsl.extension.onToolCall
+import ai.koog.agents.core.environment.ReceivedToolResult
+import ai.koog.agents.core.environment.result
+import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.executor.llms.all.simpleOpenAIExecutor
+import ai.koog.prompt.llm.LLModel
+import ai.koog.prompt.structure.StructuredData
 import ai.koog.prompt.structure.StructuredResponse
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.freshmorsikov.tutor.LearningPlan
+import com.github.freshmorsikov.tutor.agent.TopicLLM
+import com.github.freshmorsikov.tutor.agent.tool.VideoTool
+import com.github.freshmorsikov.tutor.agent.topicStructure
 import com.github.freshmorsikov.tutor.data.LearningRepository
 import com.github.freshmorsikov.tutor.data.Node
-import com.github.freshmorsikov.tutor.learningPlanStructure
 import com.github.freshmorsikov.tutor.presentation.MainState.Subtopic
+import com.github.freshmorsikov.tutor.presentation.mapper.toModel
+import com.github.freshmorsikov.tutor.presentation.mapper.toSubtopic
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,31 +44,41 @@ class MainViewModel(
     private val subtopicChannel: Channel<String> = Channel()
 
     private val mainStrategy = strategy<String, String>(name = "Main") {
-        val nodeCallLLM by nodeLLMRequestStructured(
-            structure = learningPlanStructure,
+        val nodeCallLLM by nodeLLMRequest()
+        val callTool by nodeExecuteTool()
+        val sendToolResult by nodeLLMStructuredSendToolResult(
+            structure = topicStructure,
             retries = 3,
             fixingModel = OpenAIModels.Chat.GPT4o,
         )
+
         val nodeUpdateState by nodeUpdateState()
         val nodeSubtopicDiving by nodeSubtopicDiving()
 
         edge(nodeStart forwardTo nodeCallLLM)
-        edge(nodeCallLLM forwardTo nodeUpdateState)
+        edge(nodeCallLLM forwardTo callTool onToolCall { true })
+        edge(callTool forwardTo sendToolResult)
+        edge(sendToolResult forwardTo nodeUpdateState)
         edge(nodeUpdateState forwardTo nodeSubtopicDiving)
         edge(nodeSubtopicDiving forwardTo nodeCallLLM onCondition { it.isSuccess } transformed { it.getOrNull() ?: "" })
         edge(nodeUpdateState forwardTo nodeFinish onCondition { false })
+    }
+    val toolRegistry = ToolRegistry {
+        tool(VideoTool)
     }
     private val agent = AIAgent(
         executor = simpleOpenAIExecutor(BuildConfig.OPENAI_API_KEY),
         llmModel = OpenAIModels.Chat.GPT4o,
         strategy = mainStrategy,
+        toolRegistry = toolRegistry,
         systemPrompt = """
                 You are an expert tutor that helps generate high-level learning plan by given topic.
                 When user gives you topic for learning:
                 1. Give a brief overview of the topic.
-                2. Make a high-level plan for studying this topic with list of subtopics subtopics to dive deeper.
+                2. Find learning videos by the topic.
+                3. Make a high-level plan for studying this topic with list of subtopics subtopics to dive deeper.
                 
-                Always respond with a JSON object containing a fields: 'topic', 'overview' and 'subtopics'
+                Always respond with a JSON object containing a fields: 'topic', 'overview', 'videos' and 'subtopics'
             """
     )
 
@@ -110,16 +127,8 @@ class MainViewModel(
             _state.update {
                 currentData.copy(
                     topicChain = currentData.topicChain + topicChainItem,
-                    topic = switchedNode.title,
-                    overview = switchedNode.overview,
-                    subtopics = switchedNode.subtopics.map { subtopic ->
-                        Subtopic(
-                            id = subtopic.id,
-                            title = subtopic.title,
-                            isLoading = false,
-                            isExplored = subtopic is Node.Explored,
-                        )
-                    },
+                    topic = switchedNode.topic,
+                    subtopics = switchedNode.subtopics.map(Node::toSubtopic),
                 )
             }
         }
@@ -139,22 +148,14 @@ class MainViewModel(
                 topicChain = currentData.topicChain.dropLastWhile { topicChainItem ->
                     topicChainItem.id != parentNode.id
                 },
-                topic = parentNode.title,
-                overview = parentNode.overview,
-                subtopics = parentNode.subtopics.map { subtopic ->
-                    Subtopic(
-                        id = subtopic.id,
-                        title = subtopic.title,
-                        isLoading = false,
-                        isExplored = subtopic is Node.Explored,
-                    )
-                },
+                topic = parentNode.topic,
+                subtopics = parentNode.subtopics.map(Node::toSubtopic),
             )
         }
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    private fun AIAgentSubgraphBuilderBase<*, *>.nodeUpdateState(): AIAgentNodeDelegate<Result<StructuredResponse<LearningPlan>>, String> =
+    private fun AIAgentSubgraphBuilderBase<*, *>.nodeUpdateState(): AIAgentNodeDelegate<Result<StructuredResponse<TopicLLM>>, String> =
         node("updateState") { input ->
             input.onSuccess { data ->
                 _state.update {
@@ -168,22 +169,14 @@ class MainViewModel(
                         id = id,
                         title = data.structure.topic,
                     )
-                    val topicChain = if (currentData == null) {
-                        listOf(topicChainItem)
-                    } else {
-                        currentData.topicChain + topicChainItem
-                    }
-                    val newNode = learningRepository.exploreNode(
-                        id = loadingSubtopic?.id ?: ROOT_ID,
-                        topic = data.structure.topic,
-                        subtopics = data.structure.subtopics,
-                        overview = data.structure.overview,
-                    )
+                    val topicChain = currentData?.topicChain ?: emptyList()
 
+                    val newNode = learningRepository.exploreNode(
+                        topic = data.structure.toModel(id = id)
+                    )
                     MainState.Data(
-                        topicChain = topicChain,
-                        topic = newNode.title,
-                        overview = newNode.overview,
+                        topicChain = topicChain + topicChainItem,
+                        topic = newNode.topic,
                         subtopics = newNode.subtopics.map { subtopic ->
                             Subtopic(
                                 id = subtopic.id,
@@ -219,5 +212,29 @@ class MainViewModel(
                 }
             }
         }
+
+    @AIAgentBuilderDslMarker
+    private inline fun <reified T> AIAgentSubgraphBuilderBase<*, *>.nodeLLMStructuredSendToolResult(
+        name: String? = null,
+        structure: StructuredData<T>,
+        retries: Int,
+        fixingModel: LLModel
+    ): AIAgentNodeDelegate<ReceivedToolResult, Result<StructuredResponse<T>>> =
+        node(name) { result ->
+            llm.writeSession {
+                updatePrompt {
+                    tool {
+                        result(result)
+                    }
+                }
+
+                requestLLMStructured(
+                    structure,
+                    retries,
+                    fixingModel
+                )
+            }
+        }
+
 
 }
