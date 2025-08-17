@@ -341,7 +341,7 @@ private fun Messages(
             }
         }
 
-        state.subtopics.forEach { subtopic ->
+        state.topic.subtopics.forEach { subtopic ->
             item(key = "subtopic_${subtopic.id}") {
                 Button(
                     onClick = {
@@ -357,13 +357,14 @@ private fun Messages(
                     )
                 ) {
                     Box(contentAlignment = Alignment.Center) {
+                        val isLoading = subtopic.id == state.loadingSubtopicId
                         Text(
-                            modifier = Modifier.alpha(alpha = if (subtopic.isLoading) 0f else 1f),
+                            modifier = Modifier.alpha(alpha = if (isLoading) 0f else 1f),
                             text = subtopic.title,
                             style = MaterialTheme.typography.labelMedium
                         )
 
-                        if (subtopic.isLoading) {
+                        if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,

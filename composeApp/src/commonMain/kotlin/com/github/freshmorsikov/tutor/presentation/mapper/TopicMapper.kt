@@ -27,6 +27,7 @@ fun TopicLLM.toModel(id: String): Topic {
             Subtopic(
                 id = Uuid.random().toString(),
                 title = subtopic,
+                isExplored = false,
             )
         },
     )

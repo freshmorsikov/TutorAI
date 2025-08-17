@@ -16,4 +16,5 @@ data class Video(
 data class Subtopic(
     val id: String,
     val title: String,
+    val isExplored: Boolean,
 )

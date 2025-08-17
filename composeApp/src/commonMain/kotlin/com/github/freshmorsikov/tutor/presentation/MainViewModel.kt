@@ -1,28 +1,25 @@
 package com.github.freshmorsikov.tutor.presentation
 
 import ai.koog.agents.core.agent.AIAgent
-import ai.koog.agents.core.dsl.builder.*
+import ai.koog.agents.core.dsl.builder.AIAgentNodeDelegate
+import ai.koog.agents.core.dsl.builder.AIAgentSubgraphBuilderBase
+import ai.koog.agents.core.dsl.builder.forwardTo
+import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.dsl.extension.nodeExecuteTool
 import ai.koog.agents.core.dsl.extension.nodeLLMRequest
 import ai.koog.agents.core.dsl.extension.onToolCall
-import ai.koog.agents.core.environment.ReceivedToolResult
-import ai.koog.agents.core.environment.result
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.executor.llms.all.simpleOpenAIExecutor
-import ai.koog.prompt.llm.LLModel
-import ai.koog.prompt.structure.StructuredData
 import ai.koog.prompt.structure.StructuredResponse
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.freshmorsikov.tutor.agent.TopicLLM
+import com.github.freshmorsikov.tutor.agent.node.nodeLLMStructuredSendToolResult
 import com.github.freshmorsikov.tutor.agent.tool.VideoTool
 import com.github.freshmorsikov.tutor.agent.topicStructure
 import com.github.freshmorsikov.tutor.data.LearningRepository
-import com.github.freshmorsikov.tutor.data.Node
-import com.github.freshmorsikov.tutor.presentation.MainState.Subtopic
 import com.github.freshmorsikov.tutor.presentation.mapper.toModel
-import com.github.freshmorsikov.tutor.presentation.mapper.toSubtopic
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -107,28 +104,23 @@ class MainViewModel(
     fun selectSubtopic(subtopicId: String) {
         val currentData = _state.value as? MainState.Data ?: return
 
-        val switchedNode = learningRepository.switchToExplored(id = subtopicId)
-        if (switchedNode == null) {
+        val topic = learningRepository.switchToExplored(id = subtopicId)
+        if (topic == null) {
             viewModelScope.launch {
                 subtopicChannel.send(subtopicId)
                 _state.update {
-                    currentData.copy(
-                        subtopics = currentData.subtopics.map { subtopic ->
-                            subtopic.copy(isLoading = subtopic.id == subtopicId)
-                        }
-                    )
+                    currentData.copy(loadingSubtopicId = subtopicId)
                 }
             }
         } else {
             val topicChainItem = MainState.TopicChainItem(
-                id = switchedNode.id,
-                title = switchedNode.title
+                id = topic.id,
+                title = topic.title
             )
             _state.update {
                 currentData.copy(
                     topicChain = currentData.topicChain + topicChainItem,
-                    topic = switchedNode.topic,
-                    subtopics = switchedNode.subtopics.map(Node::toSubtopic),
+                    topic = topic
                 )
             }
         }
@@ -142,14 +134,13 @@ class MainViewModel(
 
         _state.update {
             val currentData = it as? MainState.Data ?: return@update it
-            val parentNode = learningRepository.switchToParent(topicId = topicId) ?: return@update it
+            val parentTopic = learningRepository.switchToParent(topicId = topicId) ?: return@update it
 
             currentData.copy(
                 topicChain = currentData.topicChain.dropLastWhile { topicChainItem ->
-                    topicChainItem.id != parentNode.id
+                    topicChainItem.id != parentTopic.id
                 },
-                topic = parentNode.topic,
-                subtopics = parentNode.subtopics.map(Node::toSubtopic),
+                topic = parentTopic
             )
         }
     }
@@ -161,30 +152,19 @@ class MainViewModel(
                 _state.update {
                     val currentData = it as? MainState.Data
 
-                    val loadingSubtopic = currentData?.subtopics?.find { subtopic ->
-                        subtopic.isLoading
-                    }
-                    val id = loadingSubtopic?.id ?: ROOT_ID
+                    val id = currentData?.loadingSubtopicId ?: ROOT_ID
                     val topicChainItem = MainState.TopicChainItem(
                         id = id,
                         title = data.structure.topic,
                     )
                     val topicChain = currentData?.topicChain ?: emptyList()
 
-                    val newNode = learningRepository.exploreNode(
-                        topic = data.structure.toModel(id = id)
-                    )
+                    val topic = data.structure.toModel(id = id)
+                    learningRepository.exploreTopic(topic = topic)
                     MainState.Data(
                         topicChain = topicChain + topicChainItem,
-                        topic = newNode.topic,
-                        subtopics = newNode.subtopics.map { subtopic ->
-                            Subtopic(
-                                id = subtopic.id,
-                                title = subtopic.title,
-                                isLoading = false,
-                                isExplored = subtopic is Node.Explored,
-                            )
-                        }
+                        topic = topic,
+                        loadingSubtopicId = null,
                     )
                 }
             }.onFailure {
@@ -200,7 +180,7 @@ class MainViewModel(
 
             when (val currentValue = _state.value) {
                 is MainState.Data -> {
-                    currentValue.subtopics.find { subtopic ->
+                    currentValue.topic.subtopics.find { subtopic ->
                         subtopic.id == subtopicId
                     }?.let { subtopic ->
                         Result.success(value = subtopic.title)
@@ -212,29 +192,5 @@ class MainViewModel(
                 }
             }
         }
-
-    @AIAgentBuilderDslMarker
-    private inline fun <reified T> AIAgentSubgraphBuilderBase<*, *>.nodeLLMStructuredSendToolResult(
-        name: String? = null,
-        structure: StructuredData<T>,
-        retries: Int,
-        fixingModel: LLModel
-    ): AIAgentNodeDelegate<ReceivedToolResult, Result<StructuredResponse<T>>> =
-        node(name) { result ->
-            llm.writeSession {
-                updatePrompt {
-                    tool {
-                        result(result)
-                    }
-                }
-
-                requestLLMStructured(
-                    structure,
-                    retries,
-                    fixingModel
-                )
-            }
-        }
-
 
 }

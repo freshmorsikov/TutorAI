@@ -12,7 +12,7 @@ sealed interface MainState {
     data class Data(
         val topicChain: List<TopicChainItem>,
         val topic: Topic,
-        val subtopics: List<Subtopic>,
+        val loadingSubtopicId: String?,
     ) : MainState {
 
         val previousTopicId: String?
