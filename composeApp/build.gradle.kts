@@ -66,13 +66,15 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        wasmJsMain.dependencies {
+            implementation(libs.kotlinx.browser)
+        }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
         }
     }
 }
-
 
 compose.desktop {
     application {

@@ -310,7 +310,7 @@ private fun Messages(
                                         interactionSource = interactionSource,
                                         indication = LocalIndication.current,
                                         onClick = {
-                                            // TODO implement navigation
+                                            openLink(video.title)
                                         }
                                     )
                                     .background(color = Color(0xFFF53154))

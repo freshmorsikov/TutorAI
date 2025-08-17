@@ -3,12 +3,13 @@ androidx-lifecycle = "2.9.1"
 composeHotReload = "1.0.0-alpha11"
 composeMultiplatform = "1.8.2"
 junit = "4.13.2"
-kotlin = "2.2.0"
+kotlin = "2.2.20-Beta2"
 kotlinx-coroutines = "1.10.2"
 koog = "0.3.0"
 buildConfig = "5.6.7"
 serialization = "1.9.0"
 koin = "4.0.3"
+kotlinxBrowser = "0.5.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -22,6 +23,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 
 koin-compose = { group = "io.insert-koin", name = "koin-compose", version.ref = "koin" }
 koin-compose-viewmodel = { group = "io.insert-koin", name = "koin-compose-viewmodel", version.ref = "koin" }
+
+kotlinx-browser = { group = "org.jetbrains.kotlinx", name = "kotlinx-browser", version.ref = "kotlinxBrowser" }
 
 [bundles]
 koin = [
