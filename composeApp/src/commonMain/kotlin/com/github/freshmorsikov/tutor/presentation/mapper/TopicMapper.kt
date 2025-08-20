@@ -13,16 +13,12 @@ fun TopicLLM.toModel(id: String): Topic {
         id = id,
         title = topic,
         overview = overview,
-        videos = listOf(
+        videos = videos.map { video ->
             Video(
-                title = videos,
-                url = videos,
-            ),
-            Video(
-                title = videos,
-                url = videos,
-            ),
-        ),
+                title = video.title,
+                url = video.url,
+            )
+        },
         subtopics = subtopics.map { subtopic ->
             Subtopic(
                 id = Uuid.random().toString(),

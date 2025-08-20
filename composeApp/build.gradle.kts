@@ -13,14 +13,10 @@ plugins {
 }
 
 buildConfig {
-    val authToken = rootProject.file("local.properties")
-        .inputStream()
-        .use { input ->
-            Properties().apply {
-                load(input)
-            }.getProperty("OPENAI_API_KEY")
-        }
+    val authToken = loadFromLocalProperties("OPENAI_API_KEY")
     buildConfigField("OPENAI_API_KEY", authToken)
+    val googleAuthToken = loadFromLocalProperties("GOOGLE_API_KEY")
+    buildConfigField("GOOGLE_API_KEY", googleAuthToken)
 }
 
 kotlin {
@@ -68,6 +64,7 @@ kotlin {
         }
         wasmJsMain.dependencies {
             implementation(libs.kotlinx.browser)
+            implementation(libs.bundles.ktor.wasm)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
@@ -86,4 +83,14 @@ compose.desktop {
             packageVersion = "1.0.0"
         }
     }
+}
+
+private fun loadFromLocalProperties(key: String): String {
+    return rootProject.file("local.properties")
+        .inputStream()
+        .use { input ->
+            Properties().apply {
+                load(input)
+            }.getProperty(key)
+        }
 }

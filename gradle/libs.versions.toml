@@ -10,6 +10,7 @@ buildConfig = "5.6.7"
 serialization = "1.9.0"
 koin = "4.0.3"
 kotlinxBrowser = "0.5.0"
+ktorWasm = "3.0.0-wasm2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -26,10 +27,21 @@ koin-compose-viewmodel = { group = "io.insert-koin", name = "koin-compose-viewmo
 
 kotlinx-browser = { group = "org.jetbrains.kotlinx", name = "kotlinx-browser", version.ref = "kotlinxBrowser" }
 
+ktor-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktorWasm" }
+ktor-js = { group = "io.ktor", name = "ktor-client-js", version.ref = "ktorWasm" }
+ktor-serialization-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktorWasm" }
+ktor-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktorWasm" }
+
 [bundles]
 koin = [
     "koin-compose",
     "koin-compose-viewmodel"
+]
+ktor-wasm = [
+    "ktor-core",
+    "ktor-js",
+    "ktor-serialization-json",
+    "ktor-content-negotiation",
 ]
 
 [plugins]
